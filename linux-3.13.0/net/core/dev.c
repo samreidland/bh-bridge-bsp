@@ -3536,13 +3536,6 @@ another_round:
 
 	__this_cpu_inc(softnet_data.processed);
 
-	if (skb->protocol == cpu_to_be16(ETH_P_8021Q) ||
-	    skb->protocol == cpu_to_be16(ETH_P_8021AD)) {
-		skb = vlan_untag(skb);
-		if (unlikely(!skb))
-			goto unlock;
-	}
-
 #ifdef CONFIG_NET_CLS_ACT
 	if (skb->tc_verd & TC_NCLS) {
 		skb->tc_verd = CLR_TC_NCLS(skb->tc_verd);
@@ -3578,20 +3571,11 @@ ncls:
 	if (pfmemalloc && !skb_pfmemalloc_protocol(skb))
 		goto drop;
 
-	if (vlan_tx_tag_present(skb)) {
-		if (pt_prev) {
-			ret = deliver_skb(skb, pt_prev, orig_dev);
-			pt_prev = NULL;
-		}
-		if (vlan_do_receive(&skb))
-			goto another_round;
-		else if (unlikely(!skb))
-			goto unlock;
-	}
-
 	rx_handler = rcu_dereference(skb->dev->rx_handler);
 	if (rx_handler) {
 		if (pt_prev) {
+			/* hand the packet to raw sockets listening on
+			 * a bridge port */
 			ret = deliver_skb(skb, pt_prev, orig_dev);
 			if (ret) {
 				kfree_skb(skb);
@@ -3613,6 +3597,26 @@ ncls:
 		default:
 			BUG();
 		}
+	}
+
+	/* postponed vlan untagging until after the bridge handling: allows
+	 * raw sockets to also receive the vlan header if the packet arrived
+	 * on a bridge port. */
+	if (skb->protocol == cpu_to_be16(ETH_P_8021Q) ||
+	    skb->protocol == cpu_to_be16(ETH_P_8021AD)) {
+		skb = vlan_untag(skb);
+		if (unlikely(!skb))
+			goto unlock;
+	}
+	if (vlan_tx_tag_present(skb)) {
+		if (pt_prev) {
+			ret = deliver_skb(skb, pt_prev, orig_dev);
+			pt_prev = NULL;
+		}
+		if (vlan_do_receive(&skb))
+			goto another_round;
+		else if (unlikely(!skb))
+			goto unlock;
 	}
 
 	if (unlikely(vlan_tx_tag_present(skb))) {
