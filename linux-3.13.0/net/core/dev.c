@@ -3553,7 +3553,7 @@ another_round:
 				if (ret) {
 					kfree_skb(skb);
 					ret = NET_RX_DROP;
-					goto out;
+					goto unlock;
 				}
 			}
 			pt_prev = ptype;
@@ -3580,7 +3580,7 @@ ncls:
 			if (ret) {
 				kfree_skb(skb);
 				ret = NET_RX_DROP;
-				goto out;
+				goto unlock;
 			}
 			pt_prev = NULL;
 		}
