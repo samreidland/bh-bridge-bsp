@@ -3502,6 +3502,7 @@ static bool skb_pfmemalloc_protocol(struct sk_buff *skb)
 	}
 }
 
+#define DEBUG_PRINTS
 static int __netif_receive_skb_core(struct sk_buff *skb, bool pfmemalloc)
 {
 	struct packet_type *ptype, *pt_prev;
@@ -3531,6 +3532,12 @@ static int __netif_receive_skb_core(struct sk_buff *skb, bool pfmemalloc)
 
 	rcu_read_lock();
 
+#ifdef DEBUG_PRINTS
+	printk(KERN_INFO "rx on %s\n", skb->dev->name);
+	if (vlan_tx_tag_present(skb)) {
+		printk(KERN_INFO "vlan tag stripped by hardware: id=%d\n", vlan_tx_tag_get(skb) & VLAN_VID_MASK);
+	}
+#endif
 another_round:
 	skb->skb_iif = skb->dev->ifindex;
 
@@ -3549,6 +3556,9 @@ another_round:
 	list_for_each_entry_rcu(ptype, &ptype_all, list) {
 		if (!ptype->dev || ptype->dev == skb->dev) {
 			if (pt_prev) {
+#ifdef DEBUG_PRINTS
+				printk("deliver point 1\n");
+#endif
 				ret = deliver_skb(skb, pt_prev, orig_dev);
 				if (ret) {
 					kfree_skb(skb);
@@ -3574,6 +3584,9 @@ ncls:
 	rx_handler = rcu_dereference(skb->dev->rx_handler);
 	if (rx_handler) {
 		if (pt_prev) {
+#ifdef DEBUG_PRINTS
+			printk("deliver point 2: bridge port\n");
+#endif
 			/* hand the packet to raw sockets listening on
 			 * a bridge port */
 			ret = deliver_skb(skb, pt_prev, orig_dev);
@@ -3604,12 +3617,20 @@ ncls:
 	 * on a bridge port. */
 	if (skb->protocol == cpu_to_be16(ETH_P_8021Q) ||
 	    skb->protocol == cpu_to_be16(ETH_P_8021AD)) {
+#ifdef DEBUG_PRINTS
+		struct vlan_hdr *vhdr = (struct vlan_hdr *) skb->data;
+
+		printk(KERN_INFO "stripping vlan tag: id=%d\n", ntohs(vhdr->h_vlan_TCI) & VLAN_VID_MASK);
+#endif
 		skb = vlan_untag(skb);
 		if (unlikely(!skb))
 			goto unlock;
 	}
 	if (vlan_tx_tag_present(skb)) {
 		if (pt_prev) {
+#ifdef DEBUG_PRINTS
+				printk("deliver point 3: vlan header\n");
+#endif
 			ret = deliver_skb(skb, pt_prev, orig_dev);
 			pt_prev = NULL;
 		}
@@ -3638,8 +3659,12 @@ ncls:
 		if (ptype->type == type &&
 		    (ptype->dev == null_or_dev || ptype->dev == skb->dev ||
 		     ptype->dev == orig_dev)) {
-			if (pt_prev)
+			if (pt_prev) {
+#ifdef DEBUG_PRINTS
+				printk("deliver point 4\n");
+#endif
 				ret = deliver_skb(skb, pt_prev, orig_dev);
+			}
 			pt_prev = ptype;
 		}
 	}
@@ -3647,8 +3672,12 @@ ncls:
 	if (pt_prev) {
 		if (unlikely(skb_orphan_frags(skb, GFP_ATOMIC)))
 			goto drop;
-		else
+		else {
+#ifdef DEBUG_PRINTS
+				printk("deliver point 5\n");
+#endif
 			ret = pt_prev->func(skb, skb->dev, pt_prev, orig_dev);
+		}
 	} else {
 drop:
 		atomic_long_inc(&skb->dev->rx_dropped);
