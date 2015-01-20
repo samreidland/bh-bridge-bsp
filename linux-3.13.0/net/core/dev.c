@@ -3534,10 +3534,25 @@ static int __netif_receive_skb_core(struct sk_buff *skb, bool pfmemalloc)
 
 #ifdef DEBUG_PRINTS
 	printk(KERN_INFO "rx on %s\n", skb->dev->name);
-	if (vlan_tx_tag_present(skb)) {
-		printk(KERN_INFO "vlan tag stripped by hardware: id=%d\n", vlan_tx_tag_get(skb) & VLAN_VID_MASK);
-	}
 #endif
+
+	if (vlan_tx_tag_present(skb)) {
+#ifdef DEBUG_PRINTS
+		printk(KERN_INFO "vlan tag stripped by hardware: id=%d\n", vlan_tx_tag_get(skb) & VLAN_VID_MASK);
+#endif
+		/* if the hardware stripped the vlan tag, we add it back so that
+		 * AF_PACKET sockets see the full frame */
+		skb_push(skb, ETH_HLEN);
+		skb = __vlan_put_tag(skb, skb->vlan_proto, vlan_tx_tag_get(skb));
+		if (unlikely(!skb))
+			goto unlock;
+		/* unset the vlan_tx_tag_present flag */
+		skb->vlan_tci = 0;
+		skb_pull(skb, ETH_HLEN);
+#ifdef DEBUG_PRINTS
+		printk(KERN_INFO "unstripped vlan tag for AF_PACKET sockets\n");
+#endif
+	}
 another_round:
 	skb->skb_iif = skb->dev->ifindex;
 
