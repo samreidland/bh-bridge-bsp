@@ -1645,8 +1645,8 @@ static inline void net_timestamp_set(struct sk_buff *skb)
 			__net_timestamp(SKB);		\
 	}						\
 
-static inline bool is_skb_forwardable(struct net_device *dev,
-				      struct sk_buff *skb)
+bool is_skb_forwardable(struct net_device *dev,
+		        struct sk_buff *skb)
 {
 	unsigned int len;
 
@@ -1665,6 +1665,7 @@ static inline bool is_skb_forwardable(struct net_device *dev,
 
 	return false;
 }
+EXPORT_SYMBOL_GPL(is_skb_forwardable);
 
 /**
  * dev_forward_skb - loopback an skb to another netif
