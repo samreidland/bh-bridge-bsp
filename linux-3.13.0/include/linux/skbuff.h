@@ -337,6 +337,17 @@ typedef unsigned int sk_buff_data_t;
 typedef unsigned char *sk_buff_data_t;
 #endif
 
+/* If this macro is defined, an extra flag is added to the sk_buff to identify
+ * that the packet has been decrypted by ipsec. Using this flag could
+ * potentially improve performance in case there is a lot of local traffic to
+ * the box that doesn't match the Sevis application's bpf filter. When this flag
+ * isn't used, the Sevis filter will be used twice e.g. on icmp requests to
+ * the box: once with the bridge port as input device and once with the bridge
+ * itself as input device (see dev.c::__netif_receive_skb_core).
+ * Since this flag increases the sk_buff size, this macro should only be turned
+ * on in case a performance improvement is observed.
+ */
+/*#define SEVIS_IPSEC_SKB_FLAG*/
 /** 
  *	struct sk_buff - socket buffer
  *	@next: Next buffer in list
@@ -344,6 +355,7 @@ typedef unsigned char *sk_buff_data_t;
  *	@tstamp: Time we arrived
  *	@sk: Socket we are owned by
  *	@dev: Device we arrived on/are leaving by
+ *	@rx_bridge_port: Bridge port we arrived on (needed for Sevis IPSec support)
  *	@cb: Control buffer. Free for use by every layer. Put private vars here
  *	@_skb_refdst: destination entry (with norefcount bit)
  *	@sp: the security path, used for xfrm
@@ -414,6 +426,10 @@ struct sk_buff {
 
 	struct sock		*sk;
 	struct net_device	*dev;
+	struct net_device	*rx_bridge_port;
+#ifdef SEVIS_IPSEC_SKB_FLAG
+	char			ipsec_packet;
+#endif
 
 	/*
 	 * This is the control buffer. It is free to use for every

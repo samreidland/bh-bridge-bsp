@@ -161,6 +161,9 @@ drop:
 
 int xfrm4_rcv(struct sk_buff *skb)
 {
+#ifdef SEVIS_IPSEC_SKB_FLAG
+	skb->ipsec_packet = 1;
+#endif
 	return xfrm4_rcv_spi(skb, ip_hdr(skb)->protocol, 0);
 }
 EXPORT_SYMBOL(xfrm4_rcv);

@@ -51,6 +51,13 @@ static int br_pass_frame_up(struct sk_buff *skb)
 
 	indev = skb->dev;
 	skb->dev = brdev;
+	/* Save the bridge port: this is needed for Sevis IPSec handling.
+	 * To reduce code complexity, we save the bridge port independent of
+	 * whether this is actually IPSec traffic.
+	 * In case SEVIS_IPSEC_SKB_FLAG is defined in skbuff.h, the IPSec code
+	 * will set a flag identifying the packet as originally being encrypted.
+	 */
+	skb->rx_bridge_port = indev;
 
 	return NF_HOOK(NFPROTO_BRIDGE, NF_BR_LOCAL_IN, skb, indev, NULL,
 		       netif_receive_skb);

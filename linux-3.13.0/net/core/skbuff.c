@@ -719,6 +719,11 @@ static void __copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	new->vlan_proto		= old->vlan_proto;
 	new->vlan_tci		= old->vlan_tci;
 
+	new->rx_bridge_port	= old->rx_bridge_port;
+#ifdef SEVIS_IPSEC_SKB_FLAG
+	new->ipsec_packet	= old->ipsec_packet;
+#endif
+
 	skb_copy_secmark(new, old);
 
 #ifdef CONFIG_NET_RX_BUSY_POLL
@@ -3568,6 +3573,10 @@ void skb_scrub_packet(struct sk_buff *skb, bool xnet)
 	secpath_reset(skb);
 	nf_reset(skb);
 	nf_reset_trace(skb);
+	skb->rx_bridge_port = NULL;
+#ifdef SEVIS_IPSEC_SKB_FLAG
+	skb->ipsec_packet = 0;
+#endif
 }
 EXPORT_SYMBOL_GPL(skb_scrub_packet);
 

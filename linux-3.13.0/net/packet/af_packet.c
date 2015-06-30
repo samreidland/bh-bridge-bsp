@@ -3895,10 +3895,17 @@ static const struct file_operations packet_seq_fops = {
 
 #endif
 
+/* defined in dev.c */
+extern
+int (*tpacket_rcv_ptr) (struct sk_buff *,
+			struct net_device *,
+			struct packet_type *,
+			struct net_device *);
 static int __net_init packet_net_init(struct net *net)
 {
 	mutex_init(&net->packet.sklist_lock);
 	INIT_HLIST_HEAD(&net->packet.sklist);
+	tpacket_rcv_ptr = tpacket_rcv;
 
 	if (!proc_create("packet", 0, net->proc_net, &packet_seq_fops))
 		return -ENOMEM;

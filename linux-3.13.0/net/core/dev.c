@@ -3504,6 +3504,12 @@ static bool skb_pfmemalloc_protocol(struct sk_buff *skb)
 }
 
 #define DEBUG_PRINTS
+/* address of the tpacket_rcv function, to be filled in by af_packet.c */
+int (*tpacket_rcv_ptr) (struct sk_buff *,
+			struct net_device *,
+			struct packet_type *,
+			struct net_device *);
+EXPORT_SYMBOL(tpacket_rcv_ptr);
 static int __netif_receive_skb_core(struct sk_buff *skb, bool pfmemalloc)
 {
 	struct packet_type *ptype, *pt_prev;
@@ -3570,7 +3576,21 @@ another_round:
 		goto skip_taps;
 
 	list_for_each_entry_rcu(ptype, &ptype_all, list) {
-		if (!ptype->dev || ptype->dev == skb->dev) {
+		/* special handling for IPSec: when the raw socket handler
+		 * is tpacket_rcv and the corresponding sock is configured
+		 * with Sevis' sk_filter_drop_match flag, the bridge input
+		 * port is also used as a match.
+		 */
+		int bridge_port_match = 0;
+
+		if (ptype->dev == skb->rx_bridge_port &&
+		    ptype->func == tpacket_rcv_ptr &&
+#ifdef SEVIS_IPSEC_SKB_FLAG
+		    skb->ipsec_packet &&
+#endif
+		    ((struct sock *)(ptype->af_packet_priv))->sk_filter_drop_match == 1)
+			bridge_port_match = 1;
+		if (!ptype->dev || ptype->dev == skb->dev || bridge_port_match) {
 			if (pt_prev) {
 #ifdef DEBUG_PRINTS
 				printk("deliver point 1\n");
